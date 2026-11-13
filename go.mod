@@ -1,0 +1,48 @@
+module github.com/streasure/logic
+
+go 1.26.5
+
+require (
+	github.com/streasure/protocol v1.0.4
+	github.com/streasure/util v1.0.11
+	google.golang.org/grpc v1.67.0
+	google.golang.org/protobuf v1.36.6
+)
+
+require (
+	github.com/BurntSushi/toml v1.4.0 // indirect
+	github.com/armon/go-radix v1.0.0 // indirect
+	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
+	github.com/elastic/go-sysinfo v1.7.1 // indirect
+	github.com/elastic/go-windows v1.0.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
+	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/streasure/treasure-slog v1.0.18 // indirect
+	go.elastic.co/apm/module/apmgrpc/v2 v2.6.2 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.6.2 // indirect
+	go.elastic.co/apm/v2 v2.6.2 // indirect
+	go.elastic.co/fastjson v1.2.0 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.18 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.5.18 // indirect
+	go.etcd.io/etcd/client/v3 v3.5.18 // indirect
+	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/zap v1.17.0 // indirect
+	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
+)
+
+replace (
+	github.com/streasure/protocol => ../protocol
+	github.com/streasure/treasure-slog => ../treasure-slog
+	github.com/streasure/util => ../util
+)
