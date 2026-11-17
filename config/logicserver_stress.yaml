@@ -1,0 +1,23 @@
+# 压测专用配置：与 logicserver.yaml 取值一致，仅用于压测切换。
+# logicserver 无限流/准入/熔断等非业务防护可关（这是它比 sgate/loginserver 简单的地方），
+# 压测差异只在日志降噪——搭配 config/tlog_stress.yaml（仅 error 级）使用。
+# 本文件与常规配置同构，避免压测时直接改坏常规配置。
+# 用法：scripts\start.bat config\logicserver_stress.yaml config\tlog_stress.yaml
+belong: "default"
+zone: "default"
+serverId: "logic1-ws"    # 压测同样要与 bench1_ws -server-id 对齐（etcd instanceID + flip LogicID）
+serverType: "Logic"
+serviceName: "logic"
+
+ports:
+  grpcPort: 50053        # flip 流入口
+
+etcd:
+  endpoints: ["http://127.0.0.1:2379"]
+
+shardCount: 0            # 0 = NumCPU*8；压测不改，口径与 bench/logic_* 一致
+
+# 压测可调项（按需放开；改动压测口径须在提交信息标注）：
+# reliability:           # 可靠推送压测（对应 bench/logic_reliable 口径）
+#   windowSize: 256      # 每会话未确认窗口（默认 64）
+#   maxRetries: 8        # 单条最大重传次数（默认 5）

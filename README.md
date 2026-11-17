@@ -7,6 +7,9 @@ gRPC 双向流服务端、etcd 服务注册、flip 模式拨入网关（logic �
 上行命令分发（RegisterProto）、会话/用户/分组管理，以及可靠推送
 （PushReliable：端到端 ACK + 重传 + 窗口背压）。
 
+本仓同时包含**可执行服务** `cmd/logicserver`（骨架与边界见
+[`docs/architecture.md`](docs/architecture.md)）：SDK 的第一个真实消费者。
+
 ## 依赖
 
 - `github.com/streasure/protocol` — wire 契约（命令码、StreamData、
@@ -33,6 +36,40 @@ svc.Run()
 
 完整接入手册（配置项、推送 API、可靠推送语义、联调清单）见 sgate 仓
 `docs/logic-guide.md`。
+
+## 运行 logicserver
+
+装配、停机顺序、flip 握手与包边界规则见 [`docs/architecture.md`](docs/architecture.md)。
+
+```bash
+# 常规（默认 config/logicserver.yaml + config/tlog.yaml）
+scripts\start.bat                       # Windows
+./scripts/start-linux.sh                # Linux/macOS
+
+# 压测（配置传参；压测日志仅 error 级）
+scripts\start.bat config\logicserver_stress.yaml config\tlog_stress.yaml
+./scripts/start-linux.sh ./config/logicserver_stress.yaml ./config/tlog_stress.yaml
+
+# 等价单起
+go run ./cmd/logicserver -conf config/logicserver.yaml -logger config/tlog.yaml
+```
+
+配置 4 件套（`config/`）：
+
+| 文件 | 用途 |
+| --- | --- |
+| `logicserver.yaml` | 常规：身份（belong/zone/serverId）、gRPC 端口、etcd 端点 |
+| `tlog.yaml` | 常规日志（info 级，写 `logs/logicserver.log`） |
+| `logicserver_stress.yaml` | 压测：与常规同构（本服务无限流/准入等防护可关） |
+| `tlog_stress.yaml` | 压测日志（仅 error 级，降噪） |
+
+**`serverId` 必须与网关路由的 `serverId` 一致**（它是 etcd instanceID 也是 flip
+握手的 `LogicID`），本机验收与 `bench1_ws -server-id logic1-ws` 对齐。
+
+端到端验收口径（阶段 1 已过）：起服后 etcd 存在
+`/services/{belong}/SERVER_TYPE_LOGICSERVER:{zone}/{serverId}` → 网关 flip 拨入
+（日志 `gateway dial session established`）→ `bench1_ws` 登录全通、
+logicserver 侧 `login gate bound` 条数 = 登录数、无 `unregistered cmd`。
 
 ## 开发
 
