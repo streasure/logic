@@ -1,0 +1,26 @@
+# logicserver 常规配置（本机单实例）。
+# 只写环境项（身份/端口/etcd/静态网关）；「基本不改」的数值（shardCount=0 →
+# NumCPU*8、reliability 零值 → SDK 默认 /services、10s 租约）不在此重复。
+# 压测差异件套见阶段 2（config/logicserver_stress.yaml）。
+belong: "default"        # 与网关同 belong 才会互拨（etcd 注册键前缀）
+zone: "default"          # 与网关同 zone 才会互拨
+serverId: "logic1-ws"    # 实例 ID：etcd instanceID + flip LogicID，须与网关路由的 serverId 一致
+                          # （本机验收与 bench1_ws -server-id logic1-ws 对齐）
+serverType: "Logic"
+serviceName: "logic"
+
+ports:
+  grpcPort: 50053        # flip 流入口（logic 主动拨入网关，网关按需回连此端口）
+
+etcd:
+  endpoints: ["http://127.0.0.1:2379"]
+
+shardCount: 0            # 拨入每个网关的流分片数，0 = NumCPU*8
+
+# gateways:              # 静态网关兜底（etcd 不可用时仍可拨入，ip:port）
+#   - "127.0.0.1:50051"
+
+# reliability:           # 可靠推送（端到端 ACK）参数，零值走 SDK 默认
+#   windowSize: 64       # 每会话未确认窗口条数
+#   scanInterval: 200ms  # 重传扫描周期
+#   maxRetries: 5        # 单条最大重传次数（不含首发）

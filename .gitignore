@@ -1,0 +1,21 @@
+# 构建产物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# 日志文件
+*.log
+*.err
+*.out
+logs/
+
+# 测试产物
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/

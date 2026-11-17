@@ -85,6 +85,29 @@ func WithEtcd(endpoint string) ServiceOption {
 	return func(c *ServiceConfig) { c.EtcdEndpoint = endpoint }
 }
 
+// WithBelong 设置所属应用/团队标识（etcd 注册键 {belong}/SERVER_TYPE_LOGICSERVER:{zone}；
+// 空值不生效，沿用 defaultConfig 的 "default"）
+func WithBelong(belong string) ServiceOption {
+	return func(c *ServiceConfig) {
+		if belong != "" {
+			c.Belong = belong
+		}
+	}
+}
+
+// WithEtcdEndpoints 设置 etcd 端点列表（注册与拨入发现共用；空列表不生效）。
+// 列表首项同时写入单端点回退字段 EtcdEndpoint——initRegistry 以其非空为注册前提，
+// 两处必须来自同一配置源，避免"注册用 A、发现用 B"的分裂。
+func WithEtcdEndpoints(endpoints ...string) ServiceOption {
+	return func(c *ServiceConfig) {
+		if len(endpoints) == 0 {
+			return
+		}
+		c.EtcdEndpoints = endpoints
+		c.EtcdEndpoint = endpoints[0]
+	}
+}
+
 // WithGateways 设置静态网关 gRPC 地址列表（ip:port），
 // 与 etcd 服务发现互补（etcd 关闭或网关未注册时的兜底）。
 func WithGateways(addrs ...string) ServiceOption {
