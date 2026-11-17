@@ -560,6 +560,26 @@ func (s *Server) GetConnectionCount() int {
 	return count
 }
 
+// ActiveStreams 当前活跃的网关 flip 流数：readiness 判据（≥1 才算接上
+// 流量入口）与 /counters 观测。只读快照。
+func (s *Server) ActiveStreams() int {
+	count := 0
+	s.streams.Range(func(_, _ any) bool { count++; return true })
+	return count
+}
+
+// GetGroupTotal 分组总数（区别于 GetGroupCount(groupID) 的单组成员数）：
+// 断流清理若遗漏分组绑定会在此滞留增长，是泄漏观测的关键指标。只读快照。
+func (s *Server) GetGroupTotal() int {
+	s.groupMu.RLock()
+	defer s.groupMu.RUnlock()
+	return len(s.groups)
+}
+
+// PendingReliable 全部会话未确认窗口的条目总数：优雅 drain 的等待判据
+// （=0 表示可靠推送已全部被端到端 ACK 或随会话回收）。只读快照。
+func (s *Server) PendingReliable() int { return s.reliable.pending() }
+
 // SendToGroupWithRetry 向组内所有成员发送消息，失败时重试
 // 返回成功发送数量和仍失败的会话 ID 列表
 func (s *Server) SendToGroupWithRetry(groupID string, targetCmd int32, data []byte, maxRetries int) (int, []string) {

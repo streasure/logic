@@ -117,6 +117,26 @@ func (m *reliableManager) get(sessionID string) *reliableWindow {
 	return m.sessions[sessionID]
 }
 
+// pending 全部会话窗口的未确认条目总数（drain 判据 / 观测，只读）。
+// 先在 m.mu 下拷贝窗口引用、释放后再逐窗求和：避免持有 m.mu 时嵌套
+// w.mu，与其它路径的加锁顺序产生耦合。
+func (m *reliableManager) pending() int {
+	m.mu.Lock()
+	windows := make([]*reliableWindow, 0, len(m.sessions))
+	for _, w := range m.sessions {
+		windows = append(windows, w)
+	}
+	m.mu.Unlock()
+
+	total := 0
+	for _, w := range windows {
+		w.mu.Lock()
+		total += len(w.entries)
+		w.mu.Unlock()
+	}
+	return total
+}
+
 // dropSession 会话终止（Offline / 断流清理）时删除窗口：决策④窗口随会话，
 // 断线不跨会话续传，业务重连后走登录全量/增量同步拉取。
 // 返回被清掉的未确认条目数（droppedOffline 指标）。

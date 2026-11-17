@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -32,6 +33,7 @@ type Service struct {
 	cfg        ServiceConfig    // 服务配置
 	ctx        context.Context  // 服务生命周期上下文
 	stopOnce   sync.Once        // 确保只停止一次
+	registered atomic.Bool      // etcd 注册完成标记（readiness 判据，initRegistry处置位）
 }
 
 // NewService 创建逻辑层服务实例，应用配置选项
@@ -54,6 +56,11 @@ func NewService(opts ...ServiceOption) *Service {
 
 // Server 获取底层逻辑层服务端实例
 func (s *Service) Server() *Server { return s.server }
+
+// Registered 返回 etcd 注册是否已完成（readiness 判据，组合根经 probe 注入）。
+// 未配置注册（ServiceID 或 EtcdEndpoint 为空）视为已完成：没有可等待的
+// 注册动作，readiness 不应因"本就没配 etcd"而永远失败。
+func (s *Service) Registered() bool { return s.registered.Load() }
 
 // RegisterProto 注册 protobuf 协议处理器
 func (s *Service) RegisterProto(cmd int32, reqProto proto.Message, respCmd int32, handler ProtoHandler) {
@@ -114,6 +121,8 @@ func (s *Service) Start() error {
 // initRegistry 初始化 etcd 服务注册
 func (s *Service) initRegistry() {
 	if s.cfg.ServiceID == "" || s.cfg.EtcdEndpoint == "" {
+		// 无需注册：置位 readiness（没有可等待的注册动作，见 Registered 注释）。
+		s.registered.Store(true)
 		return
 	}
 	zone := s.cfg.Zone
@@ -137,7 +146,9 @@ func (s *Service) initRegistry() {
 	})
 	if err := s.registry.Start(); err != nil {
 		tlog.Error(s.ctx, "service registration failed error=%v", err)
+		return
 	}
+	s.registered.Store(true)
 }
 
 // Stop 优雅停止服务：停拨入与注册 → 关闭存量流 → 限时 gRPC 优雅停止

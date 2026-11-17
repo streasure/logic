@@ -11,9 +11,12 @@ serviceName: "logic"
 
 ports:
   grpcPort: 50053        # flip 流入口
+  metricsAddr: "127.0.0.1:6061"  # 观测端点 /healthz /readyz /counters（压测同样保留，供采样）
 
 etcd:
   endpoints: ["http://127.0.0.1:2379"]
+
+drainGrace: 10s          # 停机 drain 最长等待（0 = 不等待；压测停机口径同常规）
 
 shardCount: 0            # 0 = NumCPU*8；压测不改，口径与 bench/logic_* 一致
 

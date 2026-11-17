@@ -7,6 +7,9 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
+	"strconv"
+	"time"
 
 	logic "github.com/streasure/logic"
 	"github.com/streasure/util/uconfig"
@@ -25,11 +28,13 @@ type Config struct {
 	ShardCount  int                     `yaml:"shardCount"`                  // 拨入每个网关的流分片数（0 = NumCPU*8）
 	Gateways    []string                `yaml:"gateways"`                    // 静态网关地址（etcd 不可用时的兜底）
 	Reliability logic.ReliabilityConfig `yaml:"reliability"`                 // 可靠推送（端到端 ACK）参数，零值走 SDK 默认
+	DrainGrace  time.Duration           `yaml:"drainGrace" default:"10s"`    // 停机 drain 最长等待：等在途 handler 与未确认可靠推送排空（0 = 不等待；负值非法）
 }
 
 // Ports 服务端口。
 type Ports struct {
-	GrpcPort int `yaml:"grpcPort" default:"50053"` // gRPC 监听端口（flip 流入口）
+	GrpcPort    int    `yaml:"grpcPort" default:"50053"`             // gRPC 监听端口（flip 流入口）
+	MetricsAddr string `yaml:"metricsAddr" default:"127.0.0.1:6061"` // 观测端点 host:port（/healthz /readyz /counters），默认仅本机回环
 }
 
 // Etcd etcd 端点；前缀/租约 TTL 走 SDK 默认（/services、10s），阶段 2 配置件套再暴露。
@@ -68,6 +73,19 @@ func validate(cfg *Config) error {
 	}
 	if len(cfg.Etcd.Endpoints) == 0 || cfg.Etcd.Endpoints[0] == "" {
 		return errors.New("etcd.endpoints is required")
+	}
+	// 观测端点必填（设计案 §3.4：探针与 /counters 是上线最低观测能力），
+	// 形如 host:port；显式空串会绕过 default 标签，由 SplitHostPort 拒绝。
+	_, port, err := net.SplitHostPort(cfg.Ports.MetricsAddr)
+	if err != nil {
+		return fmt.Errorf("ports.metricsAddr must be host:port (e.g. 127.0.0.1:6061), got %q: %w",
+			cfg.Ports.MetricsAddr, err)
+	}
+	if p, convErr := strconv.Atoi(port); convErr != nil || p < 1 || p > 65535 {
+		return fmt.Errorf("ports.metricsAddr port must be in [1,65535], got %q", port)
+	}
+	if cfg.DrainGrace < 0 {
+		return fmt.Errorf("drainGrace must be >= 0 (0 = no wait), got %s", cfg.DrainGrace)
 	}
 	return nil
 }

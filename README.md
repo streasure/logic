@@ -71,6 +71,34 @@ go run ./cmd/logicserver -conf config/logicserver.yaml -logger config/tlog.yaml
 （日志 `gateway dial session established`）→ `bench1_ws` 登录全通、
 logicserver 侧 `login gate bound` 条数 = 登录数、无 `unregistered cmd`。
 
+## 观测与优雅停机（阶段 3）
+
+观测端点 `ports.metricsAddr`（默认 `127.0.0.1:6061`，仅本机回环）：
+
+| 路径 | 语义 |
+| --- | --- |
+| `GET /healthz` | 存活：进程活着即 200 `ok` |
+| `GET /readyz` | 就绪：200 `ready: ok`；否则 503 + 原因（`draining` / `not registered` / `no gateway stream`），按状态码摘挂 |
+| `GET /counters` | 计数 JSON：`service`（registered/gatewayStreams/sessions/groups/pendingReliable/draining）、`push`（totalPushed 等，与网关 `/stats` 对账）、`process` |
+
+```bash
+curl http://127.0.0.1:6061/healthz     # 200 ok
+curl http://127.0.0.1:6061/readyz      # 未接网关流时 503 no gateway stream
+curl http://127.0.0.1:6061/counters    # 对账：push.totalPushed ↔ 网关 /stats pushedToClient
+```
+
+优雅停机（SIGINT/SIGTERM，`drainGrace` 默认 10s）：置 draining（`/readyz` 随即
+503 摘流）→ 等在途 handler 与未确认可靠推送归零 → SDK 停机（停拨入 → 注销 etcd →
+关流 → GracefulStop）→ 关观测端点。超时仅 WARN 强制继续，不挂死。
+
+Windows 控制台投递信号（`taskkill` 不带 `/F` 对控制台进程无效）：
+
+```powershell
+. .\scripts\signal-helper.ps1   # 同一会话内：启动与投递必须同一条 shell 命令
+$pid = Start-InGroup -Exe "bin\logicserver.exe" -Args "-conf config\logicserver.yaml -logger config\tlog.yaml" -Cwd (Get-Location)
+Send-Break -TargetPid $pid      # CTRL_BREAK → Go 运行时映射 SIGINT
+```
+
 ## 开发
 
 - 日志统一 `github.com/streasure/util/tlog`，禁止 `fmt.Print*` / `log.*`

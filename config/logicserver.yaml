@@ -11,9 +11,13 @@ serviceName: "logic"
 
 ports:
   grpcPort: 50053        # flip 流入口（logic 主动拨入网关，网关按需回连此端口）
+  metricsAddr: "127.0.0.1:6061"  # 观测端点 /healthz /readyz /counters（默认仅本机回环）
 
 etcd:
   endpoints: ["http://127.0.0.1:2379"]
+
+drainGrace: 10s          # 停机 drain 最长等待：等在途 handler 与未确认可靠推送排空
+                         #（0 = 不等待；readiness 在 drain 开始即 503 摘流）
 
 shardCount: 0            # 拨入每个网关的流分片数，0 = NumCPU*8
 
