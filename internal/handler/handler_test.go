@@ -8,6 +8,7 @@ import (
 
 	logic "github.com/streasure/logic"
 	protocol "github.com/streasure/protocol/gateway"
+	logicpb "github.com/streasure/protocol/logic"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,6 +26,16 @@ func loginMsg(sessionID string) *protocol.StreamData {
 		panic(err)
 	}
 	return &protocol.StreamData{Cmd: protocol.CmdLoginGate, SessionId: sessionID, UserKey: "u1", Data: body}
+}
+
+// logicLoginMsg 组装一条 CmdLogicLoginReq 上游消息（与网关转发形态一致：
+// UserKey 是网关注入的 fullUUID `{serverId}:{userId}`）。
+func logicLoginMsg(sessionID, userUUID string) *protocol.StreamData {
+	body, err := proto.Marshal(&logicpb.LoginReq{UserId: "u1", LoginKey: "k1", IsReconnect: true})
+	if err != nil {
+		panic(err)
+	}
+	return &protocol.StreamData{Cmd: protocol.CmdLogicLoginReq, SessionId: sessionID, UserKey: userUUID, Data: body}
 }
 
 // dispatch 经 SDK 公开分发入口同步执行（respCmd=0 → 无应答）。
@@ -69,6 +80,41 @@ func TestDrainDropsNewRequests(t *testing.T) {
 	}
 	if got := h.InFlight(); got != 0 {
 		t.Errorf("InFlight() = %d, want 0", got)
+	}
+}
+
+// TestLogicLoginAckKeepsGatewayUserKey 登录应答的 user_key 必须回显网关注入的
+// fullUUID（`{serverId}:{userId}`），不能回裸 userId。
+// 依据：SDK 应答分发见应答 user_key 非空即覆盖响应 StreamData.UserKey，
+// 网关收到后执行 UpdateConnectionUserUUID 改绑连接身份——回裸键会让
+// 按 fullUUID 查重的重复登录踢旧连接失效（login.go GetUserConnection），
+// 且跨逻辑分片同 userId 的会话索引互撞。
+func TestLogicLoginAckKeepsGatewayUserKey(t *testing.T) {
+	_, svc := newTestHandler(t)
+	const fullUUID = "handler-test:u1"
+
+	resp, err := svc.Server().SendMessage(context.Background(), logicLoginMsg("sess-ll-1", fullUUID))
+	if err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("resp = nil, want LoginAck 应答")
+	}
+	if resp.Cmd != protocol.CmdLogicLoginAck {
+		t.Errorf("resp.Cmd = %d, want %d", resp.Cmd, protocol.CmdLogicLoginAck)
+	}
+	if resp.UserKey != fullUUID {
+		t.Errorf("应答 UserKey = %q, want fullUUID %q（裸 userId 会触发网关身份改绑）", resp.UserKey, fullUUID)
+	}
+	ack := new(logicpb.LoginAck)
+	if err := proto.Unmarshal(resp.Data, ack); err != nil {
+		t.Fatalf("unmarshal LoginAck: %v", err)
+	}
+	if ack.UserKey != fullUUID {
+		t.Errorf("LoginAck.user_key = %q, want %q", ack.UserKey, fullUUID)
+	}
+	if ack.ServerTime == 0 {
+		t.Error("LoginAck.serverTime = 0, want 非 0")
 	}
 }
 

@@ -76,6 +76,8 @@ flag(-conf/-logger/-version) → tlog.Init → config.Load(validate 失败即失
 - 分发顺序：已注册命令 → 内置命令（`heartbeat` 空处理、`useroffline` 清会话/分组/用户映射、`msgack` 移出未确认窗口）→ 未注册则 `WARN` 丢弃。
 - 应答回调：`handler` 返回 `nil` **或** `respCmd == 0` 都不回包；否则按 `respCmd` 编码下发，
   `userKey` 优先取 `resp.GetUserKey()`（非空则覆盖），`SeqId` 沿用请求。
+  **覆盖语义 = 网关改绑连接身份**：非空 `userKey` 会让网关执行 `UpdateConnectionUserUUID`；
+  默认回显 `ctx.UserUUID`（fullUUID）或留空，勿填裸 `userId`（详见 sgate `docs/logic-guide.md` §4.1）。
 
 ## 5. 会话 / 分组 / 推送（单写者）
 

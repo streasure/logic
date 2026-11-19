@@ -117,9 +117,18 @@ func (h *Handlers) pushWelcome(sessionID string) {
 func (h *Handlers) logicLogin() logic.ProtoHandler {
 	return func(ctx *logic.Context, req proto.Message) proto.Message {
 		loginReq := req.(*logicpb.LoginReq)
-		return &logicpb.LoginAck{
+		// user_key 必须回显网关注入的 ctx.UserUUID（fullUUID
+		// `{serverId}:{userId}`），不能用裸 userId：应答 user_key 非空时
+		// SDK 会用它覆盖响应的 UserKey，网关收到后据此改绑连接身份
+		// （UpdateConnectionUserUUID）。裸键会让按 fullUUID 查重的重复登录
+		// 踢旧连接失效，且跨逻辑分片同 userId 的会话索引会互撞——
+		// 与参照实现 bench/logic_logincheck 同口径（ctx.UserUUID）。
+		ack := &logicpb.LoginAck{
 			ServerTime: time.Now().UnixMilli(),
-			UserKey:    loginReq.GetUserId(),
+			UserKey:    ctx.UserUUID,
 		}
+		tlog.Info(context.TODO(), "logic login sessionID=%s user=%s account=%s reconnect=%v",
+			ctx.ConnectionID, ctx.UserUUID, loginReq.GetUserId(), loginReq.GetIsReconnect())
+		return ack
 	}
 }
