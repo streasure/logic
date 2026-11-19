@@ -99,9 +99,30 @@ $pid = Start-InGroup -Exe "bin\logicserver.exe" -Args "-conf config\logicserver.
 Send-Break -TargetPid $pid      # CTRL_BREAK → Go 运行时映射 SIGINT
 ```
 
+## 版本治理
+
+- **基线**：`v0.1.0`（记录见 [`CHANGELOG.md`](CHANGELOG.md)）。SDK 导出面纪律 =
+  **additive-only**（只增不改不删，`internal/*` 不算导出面）；破坏性变更须同轮修复
+  sgate `bench/logic_*` 全部编译通过、提交信息标注「SDK 破坏性变更」、sgate
+  `docs/logic-guide.md` 同步更新（sgate `docs/logicserver-design.md` §3.5 规则 4）。
+- **兼容性门禁**：`bash scripts/apidiff.sh`（基准 = 最近 tag → HEAD，退出码
+  0=兼容 / 1=不兼容 / 2=环境错误）。依赖 `go install github.com/joelanford/go-apidiff@main`
+  （Windows 必须 `@main`：v0.8.3 及以下缺 `//go:build`，Go 1.26 编译不过）。要求干净
+  工作区——go-apidiff 原地 checkout 两个 commit、结束自动还原 HEAD，运行期间勿操作本仓；
+  连带会清掉 untracked 内容（含 gitignored 的 `bin/`、`logs/`，实测，均可重建）。
+- **bump 规则（0.x）**：纯修复/内部重构（导出面不变）→ 可不发版，发则 patch；
+  向后兼容新增 → minor（v0.2.0 起）；破坏性变更 → minor + CHANGELOG 显式标注 breaking
+  （升 1.0.0 后破坏性 = major，且需模块路径 `/vN`）。
+- **tag 流程**：五门禁绿的提交上打 annotated tag，`CHANGELOG.md` 同轮更新；tag 随
+  提交一并推送（推送经用户确认）。
+- **`replace => ../logic` 切 `require` 的时机**：① tag 已推送远端；② 出现本地平级
+  布局之外的第二个消费者。届时 sgate 改 `require github.com/streasure/logic vX.Y.Z`
+  （`protocol` / `util` / `treasure-slog` 的 replace 保留）。
+
 ## 开发
 
 - 日志统一 `github.com/streasure/util/tlog`，禁止 `fmt.Print*` / `log.*`
 - 门禁：`gofmt -l .` / `go build ./...` / `go vet ./...` /
   `go test ./... -count=1` / `staticcheck ./...`
+- SDK 变更另跑：`bash scripts/apidiff.sh`（导出面兼容性，见上「版本治理」）
 - 跨仓工具链：`update-gomod.bat`（GONOSUMDB 跳过 sumdb 校验）
